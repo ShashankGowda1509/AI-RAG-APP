@@ -1,0 +1,161 @@
+/**
+ * PDF Question-Answering Interface
+ */
+
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const modelTypeSelect = document.getElementById('model-type');
+    const groqOptions = document.getElementById('groq-options');
+    const ollamaOptions = document.getElementById('ollama-options');
+    const groqApiKeyInput = document.getElementById('groq-api-key');
+    const ollamaApiBaseInput = document.getElementById('ollama-api-base');
+    const groqModelSelect = document.getElementById('groq-model');
+    const ollamaModelSelect = document.getElementById('ollama-model');
+    const questionInput = document.getElementById('question');
+    const askButton = document.getElementById('ask-button');
+    const answerContainer = document.getElementById('answer-container');
+    const answerText = document.getElementById('answer-text');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const aiStatus = document.getElementById('ai-status');
+    const pdfQaInterface = document.getElementById('pdf-qa-interface');
+    const selectedPdfName = document.getElementById('selected-pdf-name');
+    
+    // Event listeners for model type selection
+    if (modelTypeSelect) {
+        modelTypeSelect.addEventListener('change', function() {
+            if (this.value === 'groq') {
+                groqOptions.style.display = 'block';
+                ollamaOptions.style.display = 'none';
+            } else {
+                groqOptions.style.display = 'none';
+                ollamaOptions.style.display = 'block';
+            }
+        });
+    }
+    
+    // Select PDF buttons
+    const selectPdfButtons = document.querySelectorAll('.select-pdf');
+    if (selectPdfButtons.length > 0) {
+        selectPdfButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const fileId = this.getAttribute('data-id');
+                selectPdfForQA(fileId);
+            });
+        });
+    }
+    
+    // Ask Question button
+    if (askButton) {
+        askButton.addEventListener('click', askQuestionAboutPdf);
+    }
+    
+    // Restore API key from localStorage if available
+    if (groqApiKeyInput) {
+        const savedGroqApiKey = localStorage.getItem('groqApiKey');
+        if (savedGroqApiKey) {
+            groqApiKeyInput.value = savedGroqApiKey;
+        }
+    }
+    
+    // Save API key to localStorage when entered
+    if (groqApiKeyInput) {
+        groqApiKeyInput.addEventListener('change', function() {
+            localStorage.setItem('groqApiKey', this.value);
+        });
+    }
+    
+    /**
+     * Select a PDF for question-answering
+     * @param {string} fileId - The ID of the PDF file
+     */
+    function selectPdfForQA(fileId) {
+        fetch(`/select_pdf/${fileId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    aiStatus.style.display = 'none';
+                    pdfQaInterface.style.display = 'block';
+                    selectedPdfName.textContent = data.filename || 'Selected PDF';
+                    showNotification('PDF selected for question-answering', 'success');
+                } else {
+                    showNotification('Error selecting PDF: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error selecting PDF:', error);
+                showNotification('Error selecting PDF: ' + error.message, 'error');
+            });
+    }
+    
+    /**
+     * Ask a question about the selected PDF
+     */
+    function askQuestionAboutPdf() {
+        // Get question and model information
+        const question = questionInput.value.trim();
+        if (!question) {
+            showNotification('Please enter a question', 'error');
+            return;
+        }
+        
+        const modelType = modelTypeSelect.value;
+        let modelName, apiKey, apiBase;
+        
+        if (modelType === 'groq') {
+            modelName = groqModelSelect.value;
+            apiKey = groqApiKeyInput.value.trim();
+            if (!apiKey) {
+                showNotification('Please enter your Groq API key', 'error');
+                return;
+            }
+        } else {
+            modelName = ollamaModelSelect.value;
+            apiBase = ollamaApiBaseInput.value.trim();
+        }
+        
+        // Prepare request data
+        const requestData = {
+            question: question,
+            model_type: modelType,
+            model_name: modelName
+        };
+        
+        if (modelType === 'groq') {
+            requestData.api_key = apiKey;
+        } else {
+            requestData.api_base = apiBase;
+        }
+        
+        // Show loading indicator
+        loadingIndicator.style.display = 'block';
+        answerContainer.style.display = 'none';
+        
+        // Send request to API
+        fetch('/ask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || 'Failed to get answer');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Display answer
+            loadingIndicator.style.display = 'none';
+            answerContainer.style.display = 'block';
+            answerText.innerHTML = data.answer.replace(/\n/g, '<br>');
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            console.error('Error asking question:', error);
+            showNotification('Error: ' + error.message, 'error');
+        });
+    }
+});

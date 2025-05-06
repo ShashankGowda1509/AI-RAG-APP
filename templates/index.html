@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <h1 class="text-center mb-4">Welcome to the Document Management System</h1>
+                    <p class="lead text-center mb-5">An intelligent platform for managing your documents with AI-powered question answering.</p>
+                    
+                    <div class="row justify-content-center mb-5">
+                        <div class="col-lg-10">
+                            <div class="card bg-dark">
+                                <div class="card-body">
+                                    <h3 class="card-title mb-4 text-center">
+                                        <i class="fas fa-robot text-info me-2"></i>
+                                        AI-Powered PDF Assistant
+                                    </h3>
+                                    <p class="card-text text-center">
+                                        Upload your PDF documents and ask questions about their content. Our AI will analyze the document and provide accurate answers.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-5">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-file-pdf fa-3x text-primary"></i>
+                                    </div>
+                                    <h4 class="card-title">Document Management</h4>
+                                    <p class="card-text">Upload, organize and access your documents from anywhere.</p>
+                                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">Go to Dashboard</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-sticky-note fa-3x text-warning"></i>
+                                    </div>
+                                    <h4 class="card-title">Smart Notes</h4>
+                                    <p class="card-text">Create and organize your notes with a rich text editor.</p>
+                                    <a href="{{ url_for('notes') }}" class="btn btn-outline-warning">My Notes</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

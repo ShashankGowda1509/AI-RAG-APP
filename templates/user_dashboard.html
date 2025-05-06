@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- Include any specific CSS or libraries for the dashboard -->
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h2 class="mb-4">Welcome, {{ session.username }}!</h2>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card bg-dark text-center mb-4">
+                                <div class="card-body">
+                                    <i class="fas fa-file-pdf fa-3x mb-3 text-info"></i>
+                                    <h5 class="card-title">PDF Documents</h5>
+                                    <p class="card-text">{{ files|length }} documents</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-dark text-center mb-4">
+                                <div class="card-body">
+                                    <i class="fas fa-sticky-note fa-3x mb-3 text-warning"></i>
+                                    <h5 class="card-title">Notes</h5>
+                                    <p class="card-text">{{ notes|length }} notes</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-dark text-center mb-4">
+                                <div class="card-body">
+                                    <i class="fas fa-robot fa-3x mb-3 text-success"></i>
+                                    <h5 class="card-title">AI Assistant</h5>
+                                    <p class="card-text">Ask questions about your PDFs</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- PDF Upload and Management -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-pdf me-2"></i> PDF Documents
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" class="mb-4">
+                        <div class="mb-3">
+                            <label for="filename" class="form-label">Document Name</label>
+                            <input type="text" class="form-control" id="filename" name="filename" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Upload PDF</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i> Upload Document
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <h5 class="mb-3">My Documents</h5>
+                    {% if files %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Document Name</th>
+                                    <th scope="col">Uploaded</th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in files %}
+                                <tr>
+                                    <td>{{ file[1] }}</td>
+                                    <td>{{ file[2]|replace('.', ':').split(':')[0] }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('view_pdf', file_id=file[0]) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-success select-pdf" data-id="{{ file[0] }}">
+                                                <i class="fas fa-robot"></i>
+                                            </button>
+                                            <form action="{{ url_for('delete_pdf', file_id=file[0]) }}" method="post" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this file?');">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle me-2"></i> You haven't uploaded any documents yet.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI Question Answering -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-robot me-2"></i> AI Question Answering
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div id="ai-status" class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i> Select a PDF document to ask questions about its content.
+                    </div>
+                    
+                    <div id="pdf-qa-interface" style="display: none;">
+                        <h5 class="mb-3">
+                            Ask questions about: <span id="selected-pdf-name" class="text-primary"></span>
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <label for="model-type" class="form-label">AI Model</label>
+                            <select class="form-select" id="model-type">
+                                <option value="groq">Groq</option>
+                                <option value="ollama">Ollama</option>
+                            </select>
+                        </div>
+                        
+                        <div id="groq-options">
+                            <div class="mb-3">
+                                <label for="groq-model" class="form-label">Groq Model</label>
+                                <select class="form-select" id="groq-model">
+                                    <option value="llama3-8b-8192">LLaMa 3 (8B)</option>
+                                    <option value="llama3-70b-8192">LLaMa 3 (70B)</option>
+                                    <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="groq-api-key" class="form-label">Groq API Key</label>
+                                <input type="password" class="form-control" id="groq-api-key" placeholder="Enter your Groq API key">
+                            </div>
+                        </div>
+                        
+                        <div id="ollama-options" style="display: none;">
+                            <div class="mb-3">
+                                <label for="ollama-model" class="form-label">Ollama Model</label>
+                                <select class="form-select" id="ollama-model">
+                                    <option value="llama3">LLaMa 3</option>
+                                    <option value="mistral">Mistral</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="ollama-api-base" class="form-label">Ollama API Base URL</label>
+                                <input type="text" class="form-control" id="ollama-api-base" placeholder="http://localhost:11434" value="http://localhost:11434">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="question" class="form-label">Your Question</label>
+                            <textarea class="form-control" id="question" rows="3" placeholder="Ask a question about the document..."></textarea>
+                        </div>
+                        
+                        <div class="d-grid mb-4">
+                            <button id="ask-button" class="btn btn-success">
+                                <i class="fas fa-question-circle me-2"></i> Ask Question
+                            </button>
+                        </div>
+                        
+                        <div id="answer-container" class="mt-4" style="display: none;">
+                            <h5 class="mb-3">Answer:</h5>
+                            <div id="answer-text" class="p-3 bg-dark rounded"></div>
+                        </div>
+                        
+                        <div id="loading-indicator" class="text-center mt-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Processing your question...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pdf_qa.js') }}"></script>
+{% endblock %}
