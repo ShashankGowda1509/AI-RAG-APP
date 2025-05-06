@@ -420,8 +420,26 @@ Please answer the question based ONLY on the provided document text. If the info
                 if not groq_api_key:
                     return jsonify({'error': 'Groq API key not found in environment variables'}), 400
                 
-                logging.info("Initializing Groq model")
-                model = ChatGroq(groq_api_key=groq_api_key, model_name=model_name)
+                # Map the UI model value to the correct Groq API model format if needed
+                groq_model_mapping = {
+                    "llama3-8b-latest": "llama-3-8b-latest",
+                    "llama3-70b-latest": "llama-3-70b-latest",
+                    "mixtral-8x7b-32768": "mixtral-8x7b-32768",
+                    "gemma-7b-it": "gemma-7b-it"
+                }
+                
+                # Use the mapping if available, otherwise use as-is
+                actual_model_name = groq_model_mapping.get(model_name, model_name)
+                
+                logging.info(f"Initializing Groq model: {model_name} (mapped to: {actual_model_name})")
+                
+                # Create the Groq chat model
+                try:
+                    model = ChatGroq(groq_api_key=groq_api_key, model_name=actual_model_name)
+                    logging.info("Groq model initialized successfully")
+                except Exception as model_e:
+                    logging.error(f"Error initializing Groq model: {str(model_e)}")
+                    return jsonify({'error': f'Error initializing Groq model: {str(model_e)}'}), 500
             elif model_type == 'ollama':
                 return jsonify({'error': 'Ollama models currently disabled for debugging'}), 400
                 # model = ChatOllama(model=model_name, base_url=api_base if api_base else "http://localhost:11434")
