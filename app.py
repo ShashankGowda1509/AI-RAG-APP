@@ -431,12 +431,30 @@ ANSWER:
         else:
             return jsonify({'error': 'Invalid model type'}), 400
         
-        chain = prompt | model
-        answer = chain.invoke({"question": question, "context": context})
-        return jsonify({'answer': answer.content})
+        try:
+            chain = prompt | model
+            answer = chain.invoke({"question": question, "context": context})
+            
+            # Log successful response
+            logging.info(f"AI response generated successfully for question: {question[:50]}...")
+            
+            # Ensure we have content to return
+            if hasattr(answer, 'content') and answer.content:
+                return jsonify({'answer': answer.content})
+            else:
+                # Handle empty response case
+                logging.warning("Empty response received from model")
+                return jsonify({'answer': "I'm sorry, I wasn't able to generate an answer based on the provided document. Please try a different question."}), 200
+                
+        except Exception as inner_e:
+            # Detailed logging for the actual model invocation 
+            logging.error(f"Error in model invocation: {str(inner_e)}")
+            logging.error(f"Model: {model_name}, Question: {question[:50]}...")
+            return jsonify({'error': f'Error generating answer: {str(inner_e)}'}), 500
     except Exception as e:
-        logging.error(f"Error in AI model processing: {str(e)}")
-        return jsonify({'error': f'Error processing request: {str(e)}'}), 500
+        # General error handling
+        logging.error(f"Error in ask_question endpoint: {str(e)}")
+        return jsonify({'error': f'Server error while processing your request: {str(e)}'}), 500
 
 @app.route('/notes')
 def notes():

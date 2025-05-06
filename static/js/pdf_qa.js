@@ -119,18 +119,39 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(requestData)
         })
         .then(response => {
+            // First check if response is ok
             if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.error || 'Failed to get answer');
-                });
+                // For error responses, check the content-type to handle differently
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    // If JSON error, extract the message
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to get answer');
+                    });
+                } else {
+                    // For non-JSON errors (like HTML error pages)
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
             }
+            
+            // Check content type to ensure we're getting JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Received non-JSON response from server');
+            }
+            
             return response.json();
         })
         .then(data => {
             // Display answer
             loadingIndicator.style.display = 'none';
             answerContainer.style.display = 'block';
-            answerText.innerHTML = data.answer.replace(/\n/g, '<br>');
+            
+            if (data && data.answer) {
+                answerText.innerHTML = data.answer.replace(/\n/g, '<br>');
+            } else {
+                answerText.innerHTML = 'Received empty or invalid response from the server.';
+            }
         })
         .catch(error => {
             loadingIndicator.style.display = 'none';
