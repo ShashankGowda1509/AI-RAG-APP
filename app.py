@@ -9,7 +9,7 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from datetime import datetime, timedelta
 import pdfplumber
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.prompts import ChatPromptTemplate
@@ -438,13 +438,33 @@ ANSWER:
             # Log successful response
             logging.info(f"AI response generated successfully for question: {question[:50]}...")
             
-            # Ensure we have content to return
-            if hasattr(answer, 'content') and answer.content:
-                return jsonify({'answer': answer.content})
+            # Debug the response object
+            logging.debug(f"Response object type: {type(answer)}")
+            logging.debug(f"Response object attributes: {dir(answer) if hasattr(answer, '__dir__') else 'No dir available'}")
+            
+            # Handle different response structures based on model
+            if hasattr(answer, 'content'):
+                # Standard LangChain response format
+                answer_text = answer.content
+            elif isinstance(answer, dict) and 'content' in answer:
+                # Dictionary format response
+                answer_text = answer['content']
+            elif isinstance(answer, str):
+                # Direct string response
+                answer_text = answer
             else:
-                # Handle empty response case
-                logging.warning("Empty response received from model")
-                return jsonify({'answer': "I'm sorry, I wasn't able to generate an answer based on the provided document. Please try a different question."}), 200
+                # Try to extract as string if all else fails
+                try:
+                    answer_text = str(answer)
+                except:
+                    logging.warning("Could not convert response to string")
+                    answer_text = "I'm sorry, I wasn't able to process the response properly."
+            
+            # Log the final answer
+            logging.info(f"Extracted answer text: {answer_text[:100]}...")
+            
+            # Return the response
+            return jsonify({'answer': answer_text})
                 
         except Exception as inner_e:
             # Detailed logging for the actual model invocation 
