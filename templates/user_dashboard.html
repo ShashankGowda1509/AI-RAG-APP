@@ -154,9 +154,23 @@
                                     <option value="gemma-7b-it">Gemma (7B)</option>
                                 </select>
                             </div>
+                            {% if groq_api_key_available %}
                             <div class="alert alert-success">
                                 <i class="fas fa-check-circle me-2"></i>Groq API key is configured in the system.
                             </div>
+                            {% else %}
+                            <div class="alert alert-danger mb-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Groq API key not found in environment variables.
+                            </div>
+                            <div class="alert alert-info">
+                                <p>To use this feature, you need a Groq API key.</p>
+                                <ol class="mb-2">
+                                    <li>Sign up at <a href="https://console.groq.com/signup" target="_blank" class="text-white">console.groq.com</a></li>
+                                    <li>Create an API key in your account</li>
+                                    <li>Add it to this application's environment variables as GROQ_API_KEY</li>
+                                </ol>
+                            </div>
+                            {% endif %}
                         </div>
                         
                         <div id="ollama-options" style="display: none;">

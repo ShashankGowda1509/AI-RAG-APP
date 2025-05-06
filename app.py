@@ -211,7 +211,11 @@ def dashboard():
     notes = c.fetchall()
     
     conn.close()
-    return render_template('user_dashboard.html', files=files, notes=notes)
+    
+    # Check if Groq API key is available
+    groq_api_key_available = os.environ.get('GROQ_API_KEY') is not None
+    
+    return render_template('user_dashboard.html', files=files, notes=notes, groq_api_key_available=groq_api_key_available)
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -416,8 +420,12 @@ Please answer the question based ONLY on the provided document text. If the info
             
             # Initialize the model
             if model_type == 'groq':
+                # Check for API key in environment variables
                 groq_api_key = os.environ.get('GROQ_API_KEY')
                 if not groq_api_key:
+                    # Log the error at warning level
+                    logging.warning("GROQ_API_KEY environment variable not found or empty")
+                    logging.warning(f"Available environment variables: {[k for k in os.environ.keys() if not k.startswith('_')]}")
                     return jsonify({'error': 'Groq API key not found in environment variables'}), 400
                 
                 # Map the UI model value to the correct Groq API model format
