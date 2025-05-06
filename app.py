@@ -420,10 +420,10 @@ Please answer the question based ONLY on the provided document text. If the info
                 if not groq_api_key:
                     return jsonify({'error': 'Groq API key not found in environment variables'}), 400
                 
-                # Map the UI model value to the correct Groq API model format if needed
+                # Map the UI model value to the correct Groq API model format
                 groq_model_mapping = {
-                    "llama3-8b-latest": "llama-3-8b-latest",
-                    "llama3-70b-latest": "llama-3-70b-latest",
+                    "llama3-8b-8192": "llama3-8b-8192",
+                    "llama3-70b-8192": "llama3-70b-8192",
                     "mixtral-8x7b-32768": "mixtral-8x7b-32768",
                     "gemma-7b-it": "gemma-7b-it"
                 }
