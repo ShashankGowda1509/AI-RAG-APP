@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const modelTypeSelect = document.getElementById('model-type');
     const groqOptions = document.getElementById('groq-options');
     const ollamaOptions = document.getElementById('ollama-options');
-    const groqApiKeyInput = document.getElementById('groq-api-key');
     const ollamaApiBaseInput = document.getElementById('ollama-api-base');
     const groqModelSelect = document.getElementById('groq-model');
     const ollamaModelSelect = document.getElementById('ollama-model');
@@ -49,20 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
         askButton.addEventListener('click', askQuestionAboutPdf);
     }
     
-    // Restore API key from localStorage if available
-    if (groqApiKeyInput) {
-        const savedGroqApiKey = localStorage.getItem('groqApiKey');
-        if (savedGroqApiKey) {
-            groqApiKeyInput.value = savedGroqApiKey;
-        }
-    }
-    
-    // Save API key to localStorage when entered
-    if (groqApiKeyInput) {
-        groqApiKeyInput.addEventListener('change', function() {
-            localStorage.setItem('groqApiKey', this.value);
-        });
-    }
+    // API key is now managed by environment variables
     
     /**
      * Select a PDF for question-answering
@@ -99,15 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const modelType = modelTypeSelect.value;
-        let modelName, apiKey, apiBase;
+        let modelName, apiBase;
         
         if (modelType === 'groq') {
             modelName = groqModelSelect.value;
-            apiKey = groqApiKeyInput.value.trim();
-            if (!apiKey) {
-                showNotification('Please enter your Groq API key', 'error');
-                return;
-            }
+            // API key is managed by environment variables
         } else {
             modelName = ollamaModelSelect.value;
             apiBase = ollamaApiBaseInput.value.trim();
@@ -120,9 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
             model_name: modelName
         };
         
-        if (modelType === 'groq') {
-            requestData.api_key = apiKey;
-        } else {
+        if (modelType === 'ollama') {
             requestData.api_base = apiBase;
         }
         

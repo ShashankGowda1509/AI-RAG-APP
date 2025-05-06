@@ -22,4 +22,5 @@ dependencies = [
     "flask-mail>=0.10.0",
     "itsdangerous>=2.2.0",
     "pdfplumber>=0.11.6",
+    "rank-bm25>=0.2.2",
 ]

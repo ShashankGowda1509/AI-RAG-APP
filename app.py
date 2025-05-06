@@ -367,9 +367,11 @@ Answer:
     
     try:
         if model_type == 'groq':
-            if not api_key:
-                return jsonify({'error': 'Groq API key is required'}), 400
-            model = ChatGroq(groq_api_key=api_key, model_name=model_name)
+            # Use GROQ_API_KEY from environment
+            groq_api_key = os.environ.get('GROQ_API_KEY')
+            if not groq_api_key:
+                return jsonify({'error': 'Groq API key not found in environment variables'}), 400
+            model = ChatGroq(groq_api_key=groq_api_key, model_name=model_name)
         elif model_type == 'ollama':
             model = ChatOllama(model=model_name, base_url=api_base if api_base else "http://localhost:11434")
         else:
