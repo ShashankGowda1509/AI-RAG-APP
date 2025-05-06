@@ -343,138 +343,117 @@ def select_pdf(file_id):
 
 @app.route('/ask', methods=['POST'])
 def ask_question():
-    if 'user_id' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if 'current_pdf_id' not in session:
-        return jsonify({'error': 'No PDF selected'}), 400
-    
-    data = request.get_json()
-    question = data.get('question', '')
-    model_type = data.get('model_type', '')
-    model_name = data.get('model_name', '')
-    api_key = data.get('api_key', '')
-    api_base = data.get('api_base', '')
-    
-    if not question:
-        return jsonify({'error': 'No question provided'}), 400
-    
-    if not model_type or not model_name:
-        return jsonify({'error': 'Model type and name must be provided'}), 400
-    
-    conn = sqlite3.connect('files.db')
-    c = conn.cursor()
-    c.execute("SELECT chunk_text FROM pdf_chunks WHERE upload_id=?", (session['current_pdf_id'],))
-    chunks = [row[0] for row in c.fetchall()]
-    conn.close()
-    
-    if not chunks:
-        return jsonify({'error': 'No content found for the selected PDF'}), 400
-    
-    logging.info(f"Processing question: {question}")
-    logging.info(f"Number of chunks available: {len(chunks)}")
-    
-    # Create documents with page metadata
-    documents = [Document(page_content=chunk) for chunk in chunks]
-    
-    # Use BM25 for better retrieval of relevant chunks
-    retriever = BM25Retriever.from_documents(documents)
-    retriever.k = 8  # Retrieve more chunks for better context
-    
-    # Get relevant documents
-    related_documents = retriever.get_relevant_documents(question)
-    
-    # Log the number of related documents found
-    logging.info(f"Retrieved {len(related_documents)} relevant chunks")
-    
-    # Build context with page numbers if available
-    formatted_chunks = []
-    for doc in related_documents:
-        if "page" in doc.metadata:
-            formatted_chunks.append(f"[Page {doc.metadata['page']}] {doc.page_content}")
-        else:
-            formatted_chunks.append(doc.page_content)
-    
-    context = "\n\n".join(formatted_chunks)
-    
-    # Create a more detailed prompt for better answers
-    template = """
-You are an intelligent assistant specialized in answering questions about documents. You'll be provided with text excerpts from a document and a question about that document.
+    try:
+        if 'user_id' not in session:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        if 'current_pdf_id' not in session:
+            return jsonify({'error': 'No PDF selected'}), 400
+        
+        # Log the current session state
+        logging.info(f"Session state: user_id={session['user_id']}, current_pdf_id={session['current_pdf_id']}")
+        
+        # Parse request data with error checking
+        try:
+            data = request.get_json()
+            if data is None:
+                return jsonify({'error': 'Invalid JSON in request body'}), 400
+                
+            logging.info(f"Received request data: {data}")
+            question = data.get('question', '')
+            model_type = data.get('model_type', '')
+            model_name = data.get('model_name', '')
+            
+            # Log the received parameters
+            logging.info(f"Parsed parameters: question='{question}', model_type='{model_type}', model_name='{model_name}'")
+        except Exception as e:
+            logging.error(f"Error parsing request data: {str(e)}")
+            return jsonify({'error': f'Error parsing request: {str(e)}'}), 400
+        
+        if not question:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        if not model_type or not model_name:
+            return jsonify({'error': 'Model type and name must be provided'}), 400
+        
+        # Get the PDF chunks from database
+        try:
+            conn = sqlite3.connect('files.db')
+            c = conn.cursor()
+            c.execute("SELECT chunk_text FROM pdf_chunks WHERE upload_id=?", (session['current_pdf_id'],))
+            chunks = [row[0] for row in c.fetchall()]
+            conn.close()
+            
+            logging.info(f"Retrieved {len(chunks)} chunks from database for PDF ID {session['current_pdf_id']}")
+            
+            if not chunks:
+                return jsonify({'error': 'No content found for the selected PDF'}), 400
+        except Exception as e:
+            logging.error(f"Database error: {str(e)}")
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+        
+        # Try a simpler approach first - just combine all chunks and send directly to the model
+        try:
+            # For debugging purposes, use a simplified approach first
+            combined_text = "\n\n".join(chunks[:10])  # Take just first 10 chunks to avoid token limits
+            
+            # Create a simpler prompt
+            template = """
+You are an assistant helping with document questions. Here's a document excerpt and a question:
 
-CONTEXT:
+DOCUMENT TEXT:
 {context}
 
 QUESTION:
 {question}
 
-Please follow these guidelines when providing your answer:
-1. Answer ONLY based on the provided context. Do not use external knowledge.
-2. If the answer can't be found in the context, honestly say "I don't see information about this in the provided document sections."
-3. Include relevant page numbers in your answer when possible (e.g., "According to page 3...").
-4. Your response should be accurate, thorough, and directly address the question.
-5. Use a clear, professional tone.
-6. Provide direct quotes from the document when appropriate.
-
-ANSWER:
+Please answer the question based ONLY on the provided document text. If the information isn't in the text, say you don't know.
 """
-    prompt = ChatPromptTemplate.from_template(template)
-    
-    try:
-        if model_type == 'groq':
-            # Use GROQ_API_KEY from environment
-            groq_api_key = os.environ.get('GROQ_API_KEY')
-            if not groq_api_key:
-                return jsonify({'error': 'Groq API key not found in environment variables'}), 400
-            model = ChatGroq(groq_api_key=groq_api_key, model_name=model_name)
-        elif model_type == 'ollama':
-            model = ChatOllama(model=model_name, base_url=api_base if api_base else "http://localhost:11434")
-        else:
-            return jsonify({'error': 'Invalid model type'}), 400
-        
-        try:
-            chain = prompt | model
-            answer = chain.invoke({"question": question, "context": context})
+            prompt = ChatPromptTemplate.from_template(template)
             
-            # Log successful response
-            logging.info(f"AI response generated successfully for question: {question[:50]}...")
+            # Log the model being used
+            logging.info(f"Using model: {model_type} - {model_name}")
             
-            # Debug the response object
-            logging.debug(f"Response object type: {type(answer)}")
-            logging.debug(f"Response object attributes: {dir(answer) if hasattr(answer, '__dir__') else 'No dir available'}")
-            
-            # Handle different response structures based on model
-            if hasattr(answer, 'content'):
-                # Standard LangChain response format
-                answer_text = answer.content
-            elif isinstance(answer, dict) and 'content' in answer:
-                # Dictionary format response
-                answer_text = answer['content']
-            elif isinstance(answer, str):
-                # Direct string response
-                answer_text = answer
-            else:
-                # Try to extract as string if all else fails
-                try:
-                    answer_text = str(answer)
-                except:
-                    logging.warning("Could not convert response to string")
-                    answer_text = "I'm sorry, I wasn't able to process the response properly."
-            
-            # Log the final answer
-            logging.info(f"Extracted answer text: {answer_text[:100]}...")
-            
-            # Return the response
-            return jsonify({'answer': answer_text})
+            # Initialize the model
+            if model_type == 'groq':
+                groq_api_key = os.environ.get('GROQ_API_KEY')
+                if not groq_api_key:
+                    return jsonify({'error': 'Groq API key not found in environment variables'}), 400
                 
-        except Exception as inner_e:
-            # Detailed logging for the actual model invocation 
-            logging.error(f"Error in model invocation: {str(inner_e)}")
-            logging.error(f"Model: {model_name}, Question: {question[:50]}...")
-            return jsonify({'error': f'Error generating answer: {str(inner_e)}'}), 500
+                logging.info("Initializing Groq model")
+                model = ChatGroq(groq_api_key=groq_api_key, model_name=model_name)
+            elif model_type == 'ollama':
+                return jsonify({'error': 'Ollama models currently disabled for debugging'}), 400
+                # model = ChatOllama(model=model_name, base_url=api_base if api_base else "http://localhost:11434")
+            else:
+                return jsonify({'error': 'Invalid model type'}), 400
+            
+            # Create the chain and invoke
+            chain = prompt | model
+            response = chain.invoke({"question": question, "context": combined_text})
+            
+            # Log the response
+            logging.info(f"Response type: {type(response)}")
+            logging.info(f"Response dir: {dir(response)}")
+            
+            # Extract the answer content
+            if hasattr(response, 'content'):
+                answer_text = response.content
+            else:
+                answer_text = str(response)
+            
+            logging.info(f"Answer successfully generated: {answer_text[:100]}...")
+            
+            # Return the answer
+            return jsonify({'answer': answer_text})
+            
+        except Exception as e:
+            logging.error(f"Error in AI processing: {str(e)}")
+            return jsonify({'error': f'AI processing error: {str(e)}'}), 500
+            
     except Exception as e:
-        # General error handling
-        logging.error(f"Error in ask_question endpoint: {str(e)}")
-        return jsonify({'error': f'Server error while processing your request: {str(e)}'}), 500
+        logging.error(f"Unexpected error in ask_question: {str(e)}")
+        return jsonify({'error': 'Internal server error - check logs for details'}), 500
 
 @app.route('/notes')
 def notes():

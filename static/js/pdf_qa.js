@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', function() {
             requestData.api_base = apiBase;
         }
         
+        // Add debug info to the console
+        console.log('Sending request with data:', requestData);
+        
         // Show loading indicator
         loadingIndicator.style.display = 'block';
         answerContainer.style.display = 'none';
@@ -143,6 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
+            // Log the response data
+            console.log('Received response:', data);
+            
             // Display answer
             loadingIndicator.style.display = 'none';
             answerContainer.style.display = 'block';
