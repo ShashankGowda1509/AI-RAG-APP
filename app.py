@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 import os
 import sqlite3
 import io
+import re
 import bcrypt
 import logging
 from flask_mail import Mail, Message
@@ -231,19 +232,37 @@ def upload():
         
         # Process PDF into chunks and store
         try:
+            # Use pdfplumber for better extraction
             pdf = pdfplumber.open(io.BytesIO(file_data))
+            full_text = ""
             pages = []
-            for page in pdf.pages:
-                text = page.extract_text()
+            
+            # First extract text from all pages
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text(x_tolerance=3, y_tolerance=3)
                 if text:
-                    pages.append(Document(page_content=text, metadata={"page": page.page_number}))
+                    # Clean the text
+                    text = text.replace('\xa0', ' ')  # Replace non-breaking spaces
+                    text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+                    text = text.strip()
+                    
+                    full_text += f"\n\n=== Page {i+1} ===\n\n" + text
+                    pages.append(Document(page_content=text, metadata={"page": i+1}))
+            
             pdf.close()
             
+            # Create a more effective text splitter for better context preservation
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=2000,
-                chunk_overlap=100,
+                chunk_size=1000,  # Smaller chunks for better retrieval
+                chunk_overlap=200,  # More overlap to preserve context
+                separators=["\n\n", "\n", ". ", " ", ""],
                 add_start_index=True
             )
+            
+            # Log the extraction results for debugging
+            logging.info(f"Extracted {len(pages)} pages from PDF")
+            logging.info(f"Total text length: {len(full_text)} characters")
+            
             chunked_documents = text_splitter.split_documents(pages)
             
             for chunk in chunked_documents:
@@ -352,16 +371,51 @@ def ask_question():
     if not chunks:
         return jsonify({'error': 'No content found for the selected PDF'}), 400
     
-    documents = [Document(page_content=chunk) for chunk in chunks]
-    retriever = BM25Retriever.from_documents(documents)
-    related_documents = retriever.get_relevant_documents(question, k=5)
-    context = "\n\n".join([doc.page_content for doc in related_documents])
+    logging.info(f"Processing question: {question}")
+    logging.info(f"Number of chunks available: {len(chunks)}")
     
+    # Create documents with page metadata
+    documents = [Document(page_content=chunk) for chunk in chunks]
+    
+    # Use BM25 for better retrieval of relevant chunks
+    retriever = BM25Retriever.from_documents(documents)
+    retriever.k = 8  # Retrieve more chunks for better context
+    
+    # Get relevant documents
+    related_documents = retriever.get_relevant_documents(question)
+    
+    # Log the number of related documents found
+    logging.info(f"Retrieved {len(related_documents)} relevant chunks")
+    
+    # Build context with page numbers if available
+    formatted_chunks = []
+    for doc in related_documents:
+        if "page" in doc.metadata:
+            formatted_chunks.append(f"[Page {doc.metadata['page']}] {doc.page_content}")
+        else:
+            formatted_chunks.append(doc.page_content)
+    
+    context = "\n\n".join(formatted_chunks)
+    
+    # Create a more detailed prompt for better answers
     template = """
-You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
-Question: {question}
-Context: {context}
-Answer:
+You are an intelligent assistant specialized in answering questions about documents. You'll be provided with text excerpts from a document and a question about that document.
+
+CONTEXT:
+{context}
+
+QUESTION:
+{question}
+
+Please follow these guidelines when providing your answer:
+1. Answer ONLY based on the provided context. Do not use external knowledge.
+2. If the answer can't be found in the context, honestly say "I don't see information about this in the provided document sections."
+3. Include relevant page numbers in your answer when possible (e.g., "According to page 3...").
+4. Your response should be accurate, thorough, and directly address the question.
+5. Use a clear, professional tone.
+6. Provide direct quotes from the document when appropriate.
+
+ANSWER:
 """
     prompt = ChatPromptTemplate.from_template(template)
     

@@ -23,4 +23,5 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "pdfplumber>=0.11.6",
     "rank-bm25>=0.2.2",
+    "trafilatura>=2.0.0",
 ]
