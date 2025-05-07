@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+venv/
+.env
+*.env
+
+# Database files
+*.db
+
+# VS Code settings
+.vscode/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Replit
+.replit
+
+# Lock files
+uv.lock
