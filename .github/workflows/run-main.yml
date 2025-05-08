@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build-and-run:
+  build-and-test:
     runs-on: ubuntu-latest
 
     env:
@@ -26,16 +26,28 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install system dependencies (for pdfplumber)
+    - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y poppler-utils
 
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask flask-mail bcrypt pdfplumber langchain langchain-community langchain-core langchain-groq langchain-ollama
+        pip install flask flask-mail bcrypt pdfplumber langchain langchain-community langchain-core langchain-groq langchain-ollama requests
 
-    - name: Run Flask app
+    - name: Run Flask app in background
       run: |
-        nohup python3 main.py &
-        sleep 10
-        pgrep -f "main.py" || (echo "Flask app failed to start" && exit 1)
+        nohup python3 main.py > flask.log 2>&1 &
+        sleep 5
+
+    - name: Test /login route
+      run: |
+        python3 -c "
+import requests
+try:
+    res = requests.get('http://127.0.0.1:5000/login')
+    assert res.status_code == 200, f'Expected 200 OK, got {res.status_code}'
+    print('✅ /login route is working')
+except Exception as e:
+    print('❌ Test failed:', e)
+    exit(1)
+"
