@@ -1,73 +1,41 @@
-name: Flask Application CI/CD
+name: Flask App CI
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-env:
-  FLASK_APP: app.py
-  SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-  MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
-  MAIL_PORT: ${{ secrets.MAIL_PORT }}
-  MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-  MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-  MAIL_DEFAULT_SENDER: ${{ secrets.MAIL_DEFAULT_SENDER }}
 
 jobs:
-  build-and-test:
+  build-and-run:
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies directly from pyproject.toml
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-        pip install flake8 pytest
-        
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        
-    - name: Initialize database
-      run: |
-        python -c "from app import init_db; init_db()"
-        
-    - name: Run tests
-      run: |
-        pytest
 
-  deploy:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    
+    env:
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      MAIL_DEFAULT_SENDER: ${{ secrets.MAIL_DEFAULT_SENDER }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      MAIL_SERVER: smtp.gmail.com
+      MAIL_PORT: 587
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python 3.11
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
-    - name: Install dependencies directly from pyproject.toml
+
+    - name: Install system dependencies (for pdfplumber)
+      run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        pip install gunicorn
-        
-    - name: Deploy application
+        pip install flask flask-mail bcrypt pdfplumber langchain langchain-community langchain-core langchain-groq langchain-ollama
+
+    - name: Run Flask app
       run: |
-        echo "Starting Flask application with gunicorn"
-        gunicorn -w 4 -b 0.0.0:8000 app:app --daemon
-        echo "Application deployed successfully"
+        nohup python3 main.py &
+        sleep 10
+        pgrep -f "main.py" || (echo "Flask app failed to start" && exit 1)
