@@ -29,10 +29,11 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Extract dependencies from pyproject.toml
+    - name: Generate requirements.txt from pyproject.toml
       run: |
         echo "Extracting dependencies from pyproject.toml"
-        grep '".*>=.*"' pyproject.toml | sed 's/^[ ]*"\(.*\)",\?$/\1/' > requirements.txt
+        # This specifically targets only the package dependencies lines with proper formatting
+        sed -n '/dependencies = \[/,/\]/p' pyproject.toml | grep '".*>=.*"' | sed 's/^[ ]*"\(.*\)",\?$/\1/' > requirements.txt
         cat requirements.txt
         
     - name: Install dependencies
@@ -66,10 +67,10 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Extract dependencies from pyproject.toml
+    - name: Generate requirements.txt from pyproject.toml
       run: |
         echo "Extracting dependencies from pyproject.toml"
-        grep '".*>=.*"' pyproject.toml | sed 's/^[ ]*"\(.*\)",\?$/\1/' > requirements.txt
+        sed -n '/dependencies = \[/,/\]/p' pyproject.toml | grep '".*>=.*"' | sed 's/^[ ]*"\(.*\)",\?$/\1/' > requirements.txt
         cat requirements.txt
         
     - name: Install dependencies
