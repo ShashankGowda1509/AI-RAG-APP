@@ -1,11 +1,11 @@
-name: Flask App CI
+name: Flask App Full CI
 
 on:
   push:
   pull_request:
 
 jobs:
-  build-and-test:
+  build-test:
     runs-on: ubuntu-latest
 
     env:
@@ -32,14 +32,41 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask flask-mail bcrypt pdfplumber langchain langchain-community langchain-core langchain-groq langchain-ollama requests
+        pip install flask flask-mail bcrypt pdfplumber langchain langchain-community langchain-core langchain-groq langchain-ollama requests bandit
 
     - name: Run Flask app in background
       run: |
         nohup python3 main.py > flask.log 2>&1 &
         sleep 5
 
-    - name: Test /login route
+    - name: Sanity Check - /login route
       run: |
         python3 -c "import requests; res = requests.get('http://127.0.0.1:5000/login'); assert res.status_code == 200, f'Expected 200, got {res.status_code}'; print('✅ /login route is working')"
 
+    - name: Integration Test - Signup and Login
+      run: |
+        python3 -c "
+import requests
+import random
+import string
+
+base = 'http://127.0.0.1:5000'
+username = 'testuser_' + ''.join(random.choices(string.ascii_lowercase, k=5))
+email = username + '@test.com'
+password = 'TestPass123'
+
+session = requests.Session()
+
+# Signup
+signup = session.post(base + '/signup', data={'username': username, 'password': password, 'email': email})
+assert signup.status_code == 200 or signup.status_code == 302, 'Signup failed'
+
+# Login
+login = session.post(base + '/login', data={'username': username, 'password': password}, allow_redirects=False)
+assert login.status_code in [302, 200], f'Login failed: {login.status_code}'
+
+print(f'✅ Signup and login test passed for user {username}')
+"
+
+    - name: Security Scan with Bandit
+      run: bandit -r . -x venv -lll || true
