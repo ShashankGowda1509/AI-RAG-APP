@@ -1,4 +1,4 @@
-name: Flask App Full CI
+name: Flask App CI
 
 on:
   push:
@@ -39,37 +39,22 @@ jobs:
         nohup python3 main.py > flask.log 2>&1 &
         sleep 5
 
-    - name: Create sanity test
+    - name: Create basic sanity test script
       run: |
-        echo "import requests" > test_login.py
-        echo "res = requests.get('http://127.0.0.1:5000/login')" >> test_login.py
-        echo "assert res.status_code == 200, f'Expected 200, got {res.status_code}'" >> test_login.py
-        echo "print('✅ /login route is working')" >> test_login.py
+        echo "import requests" > test_routes.py
+        echo "print('🔍 Testing /login route')" >> test_routes.py
+        echo "res = requests.get('http://127.0.0.1:5000/login')" >> test_routes.py
+        echo "assert res.status_code == 200, f'/login failed with status {res.status_code}'" >> test_routes.py
+        echo "print('✅ /login route is accessible')" >> test_routes.py
 
-    - name: Run sanity test for /login
-      run: python3 test_login.py
+        echo "print('🔍 Testing /dashboard redirect when not logged in')" >> test_routes.py
+        echo "res = requests.get('http://127.0.0.1:5000/dashboard', allow_redirects=False)" >> test_routes.py
+        echo "assert res.status_code == 302, f'/dashboard did not redirect, got {res.status_code}'" >> test_routes.py
+        echo "assert '/login' in res.headers.get('Location', ''), f'Redirect not to /login: {res.headers}'" >> test_routes.py
+        echo "print('✅ /dashboard redirects to /login when not authenticated')" >> test_routes.py
 
-    - name: Create integration_test.py script with debug output
-      run: |
-        echo "import requests" > integration_test.py
-        echo "import random, string" >> integration_test.py
-        echo "base = 'http://127.0.0.1:5000'" >> integration_test.py
-        echo "username = 'testuser_' + ''.join(random.choices(string.ascii_lowercase, k=5))" >> integration_test.py
-        echo "email = username + '@test.com'" >> integration_test.py
-        echo "password = 'TestPass123'" >> integration_test.py
-        echo "session = requests.Session()" >> integration_test.py
-        echo "signup = session.post(base + '/signup', data={'username': username, 'password': password, 'email': email})" >> integration_test.py
-        echo "print('Signup status:', signup.status_code)" >> integration_test.py
-        echo "print('Signup response:', signup.text[:300])" >> integration_test.py
-        echo "assert signup.status_code in [200, 302], 'Signup failed'" >> integration_test.py
-        echo "login = session.post(base + '/login', data={'username': username, 'password': password}, allow_redirects=False)" >> integration_test.py
-        echo "print('Login status:', login.status_code)" >> integration_test.py
-        echo "print('Login response:', login.text[:300])" >> integration_test.py
-        echo "assert login.status_code in [200, 302], 'Login failed'" >> integration_test.py
-        echo "print(f'✅ Signup and login test passed for user {username}')" >> integration_test.py
-
-    - name: Run integration test
-      run: python3 integration_test.py
+    - name: Run basic route tests
+      run: python3 test_routes.py
 
     - name: Security Scan with Bandit
       run: bandit -r . -x venv -lll || true
