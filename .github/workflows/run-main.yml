@@ -41,17 +41,5 @@ jobs:
 
     - name: Test /login route
       run: |
-        echo "Testing /login route..."
-        python3 <<EOF
-import requests
-try:
-    res = requests.get("http://127.0.0.1:5000/login")
-    if res.status_code == 200:
-        print("✅ /login route is working")
-    else:
-        print(f"❌ Unexpected status code: {res.status_code}")
-        exit(1)
-except Exception as e:
-    print("❌ Request failed:", e)
-    exit(1)
-EOF
+        python3 -c "import requests; res = requests.get('http://127.0.0.1:5000/login'); assert res.status_code == 200, f'Expected 200, got {res.status_code}'; print('✅ /login route is working')"
+
