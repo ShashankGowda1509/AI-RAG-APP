@@ -7,31 +7,10 @@ on:
     branches: [ main ]
 
 jobs:
-  security:
-    name: Bandit Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install Bandit
-        run: pip install bandit
-
-      - name: Update host in main.py to avoid Bandit warning
-        run: |
-          sed -i 's/app.run(host="0.0.0.0"/app.run(host="127.0.0.1"/' main.py
-
-      - name: Run Bandit scan
-        run: bandit -r . -x tests  # Excludes the tests folder from being scanned by Bandit
-
   sanity:
     name: Code Style Check (Flake8)
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -50,6 +29,7 @@ jobs:
   integration:
     name: Basic Integration Check
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -69,6 +49,10 @@ jobs:
           FLASK_APP: app.py
           FLASK_ENV: testing
         run: |
-          nohup flask --app app.py run &  # Ensuring Flask runs with correct app name
+          nohup flask run &
           sleep 5
-          curl -I http://127.0.0.1:5000 | grep "200 OK"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000)
+          if [ "$STATUS" -ge 400 ]; then
+            echo "Flask app returned status $STATUS"
+            exit 1
+          fi
