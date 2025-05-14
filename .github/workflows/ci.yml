@@ -44,7 +44,7 @@ jobs:
         env:
           FLASK_ENV: testing
         run: |
-          python -m unittest discover -s tests
+          python -m unittest discover -s ./tests -p 'test_*.py'
 
   security:
     name: Bandit Security Scan
@@ -109,4 +109,8 @@ jobs:
         run: |
           nohup flask run &
           sleep 5
-          curl -I http://127.0.0.1:5000 | grep "200 OK"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000)
+          if [ "$STATUS" -ge 400 ]; then
+            echo "Flask app returned status $STATUS"
+            exit 1
+          fi
